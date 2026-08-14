@@ -216,3 +216,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# ================================
+# Automation, Docker & Local Data
+# ================================
+# n8n local data and workflows
+n8n_data/
+.n8n/
+
+# PostgreSQL local data
+postgres_data/
+
+# OS specific files
+.DS_Store
+Thumbs.db
