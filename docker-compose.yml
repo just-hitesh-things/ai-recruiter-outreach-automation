@@ -1,0 +1,65 @@
+# Local Phase 1 stack: PostgreSQL 16 + n8n.
+# Compose loads ${VARS} from the project-root .env file (gitignored).
+# Copy .env.example to .env and replace placeholder secrets before first run.
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    # Bind to loopback so the DB is not reachable from other machines on the LAN.
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      # Named volume survives container recreation; do not use a bind mount here.
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # $$ escapes Compose interpolation so pg_isready uses the container env.
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - recruiter_net
+
+  n8n:
+    image: n8nio/n8n
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      # Use Postgres instead of the default SQLite store.
+      DB_TYPE: ${DB_TYPE}
+      DB_POSTGRESDB_HOST: ${DB_POSTGRESDB_HOST}
+      DB_POSTGRESDB_PORT: ${DB_POSTGRESDB_PORT}
+      DB_POSTGRESDB_DATABASE: ${DB_POSTGRESDB_DATABASE}
+      DB_POSTGRESDB_USER: ${DB_POSTGRESDB_USER}
+      DB_POSTGRESDB_PASSWORD: ${DB_POSTGRESDB_PASSWORD}
+      N8N_HOST: ${N8N_HOST}
+      N8N_PORT: ${N8N_PORT}
+      N8N_PROTOCOL: ${N8N_PROTOCOL}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE}
+      TZ: ${GENERIC_TIMEZONE}
+      # Local HTTP; n8n defaults to Secure cookies which browsers drop over http://.
+      N8N_SECURE_COOKIE: "false"
+    volumes:
+      # Workflows, credentials ciphertext, and n8n config persist here.
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - recruiter_net
+
+volumes:
+  postgres_data:
+  n8n_data:
+
+networks:
+  recruiter_net:
+    driver: bridge
